@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Portfolio Simulator — Riesgo Argentino / Renta Fija + Cedears</title>
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Plotly CDN -->
+  <script src="https://cdn.plot.ly/plotly-2.25.2.min.js"></script>
+
+  <style>
+    /* small custom touches */
+    .card { background: linear-gradient(180deg, rgba(30,58,138,0.95), rgba(15,40,85,0.95)); }
+    /* subtle utility for number highlight */
+    .stat-num { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body class="min-h-screen bg-blue-900 text-slate-100 font-sans p-6">
+
+  <div class="max-w-6xl mx-auto">
+    <header class="mb-6">
+      <h1 class="text-3xl md:text-4xl font-bold text-center">Portfolio Simulator</h1>
+      <p class="text-center text-blue-100/70 mt-2">Allocate between <span class="font-semibold">Riesgo Argentino</span> and <span class="font-semibold">Renta Fija + Cedears</span>. See expected yield & max drawdown.</p>
+    </header>
+
+    <main class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+      <!-- INPUTS -->
+      <section class="card p-6 rounded-2xl shadow-lg">
+        <h2 class="text-xl font-semibold mb-4">Inputs</h2>
+
+        <div class="space-y-4">
+
+          <div class="flex flex-col md:flex-row items-center gap-3">
+            <label class="w-full md:w-40 text-sm">Total Amount (optional)</label>
+            <input id="totalAmount" type="number" step="any" min="0" placeholder="e.g., 100000" class="flex-1 p-2 rounded bg-blue-800 border border-blue-700 focus:outline-none" />
+          </div>
+
+          <div class="flex flex-col md:flex-row items-center gap-3">
+            <label class="w-full md:w-40 text-sm">Riesgo Argentino (%)</label>
+            <div class="flex-1 flex gap-2 items-center">
+              <input id="riesgoPct" type="number" step="any" min="0" max="100" value="40" class="p-2 rounded bg-blue-800 border border-blue-700 w-24" />
+              <input id="riesgoSlider" type="range" min="0" max="100" value="40" class="w-full" />
+            </div>
+          </div>
+
+          <hr class="border-blue-700" />
+
+          <div class="text-sm font-medium">Riesgo Argentino</div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="flex flex-col">
+              <label class="text-xs">Expected Yield (%)</label>
+              <input id="riesgoYield" type="number" step="any" value="10" class="p-2 rounded bg-blue-800 border border-blue-700" />
+            </div>
+            <div class="flex flex-col">
+              <label class="text-xs">Max Drawdown (%)</label>
+              <input id="riesgoDD" type="number" step="any" value="30" class="p-2 rounded bg-blue-800 border border-blue-700" />
+            </div>
+          </div>
+
+          <hr class="border-blue-700" />
+
+          <div class="text-sm font-medium">Renta Fija + Cedears</div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="flex flex-col">
+              <label class="text-xs">Expected Yield (%)</label>
+              <input id="rentaYield" type="number" step="any" value="8" class="p-2 rounded bg-blue-800 border border-blue-700" />
+            </div>
+            <div class="flex flex-col">
+              <label class="text-xs">Max Drawdown (%)</label>
+              <input id="rentaDD" type="number" step="any" value="5" class="p-2 rounded bg-blue-800 border border-blue-700" />
+            </div>
+          </div>
+
+          <div class="flex justify-between items-center mt-4">
+            <button id="resetBtn" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500">Reset defaults</button>
+            <button id="calcBtn" class="px-4 py-2 rounded bg-gradient-to-r from-sky-500 to-blue-500 text-slate-900 font-semibold">Calculate</button>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- OUTPUTS + CHARTS -->
+      <section class="p-6 rounded-2xl shadow-lg bg-blue-800">
+        <h2 class="text-xl font-semibold mb-4">Results</h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          <!-- Summary cards -->
+          <div class="space-y-3">
+            <div class="p-4 rounded-xl bg-blue-700 border border-blue-600">
+              <div class="text-sm text-blue-100/80">Allocation</div>
+              <div class="mt-2 flex items-baseline justify-between">
+                <div>
+                  <div class="text-xs text-blue-100/70">Riesgo Argentino</div>
+                  <div id="riesgoPctOut" class="text-2xl font-bold stat-num">—%</div>
+                  <div id="riesgoAmtOut" class="text-sm text-blue-100/70">—</div>
+                </div>
+                <div>
+                  <div class="text-xs text-blue-100/70">Renta Fija + Cedears</div>
+                  <div id="rentaPctOut" class="text-2xl font-bold stat-num text-right">—%</div>
+                  <div id="rentaAmtOut" class="text-sm text-blue-100/70 text-right">—</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-4 rounded-xl bg-blue-700 border border-blue-600">
+              <div class="text-sm text-blue-100/80">Portfolio Stats</div>
+              <div class="mt-3 grid grid-cols-1 gap-3">
+                <div class="flex items-center justify-between">
+                  <div class="text-xs">Expected Yield</div>
+                  <div id="portfolioYield" class="text-lg font-semibold stat-num">—%</div>
+                </div>
+                <div class="flex items-center justify-between">
+                  <div class="text-xs">Max Drawdown</div>
+                  <div id="portfolioDD" class="text-lg font-semibold stat-num text-rose-300">—%</div>
+                </div>
+                <div class="flex items-center justify-between">
+                  <div class="text-xs">Total Amount Allocated</div>
+                  <div id="totalAllocated" class="text-sm stat-num">—</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Charts -->
+          <div class="space-y-4">
+            <div id="allocChart" class="w-full h-48 rounded-xl bg-blue-700 border border-blue-600"></div>
+            <div id="barsChart" class="w-full h-48 rounded-xl bg-blue-700 border border-blue-600"></div>
+          </div>
+
+        </div>
+      </section>
+    </main>
+
+    <footer class="mt-6 text-center text-xs text-blue-100/60">
+      Built for GitHub Pages — static & client-side. Adjust defaults as you like.
+    </footer>
+  </div>
+
+  <!-- JS logic -->
+  <script>
+    // Elements
+    const totalAmountEl = document.getElementById('totalAmount');
+
+    const riesgoPctEl = document.getElementById('riesgoPct');
+    const riesgoSliderEl = document.getElementById('riesgoSlider');
+
+    const riesgoYieldEl = document.getElementById('riesgoYield');
+    const riesgoDDEl = document.getElementById('riesgoDD');
+
+    const rentaYieldEl = document.getElementById('rentaYield');
+    const rentaDDEl = document.getElementById('rentaDD');
+
+    const calcBtn = document.getElementById('calcBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    // Output elements
+    const riesgoPctOut = document.getElementById('riesgoPctOut');
+    const rentaPctOut = document.getElementById('rentaPctOut');
+    const riesgoAmtOut = document.getElementById('riesgoAmtOut');
+    const rentaAmtOut = document.getElementById('rentaAmtOut');
+    const portfolioYieldOut = document.getElementById('portfolioYield');
+    const portfolioDDOut = document.getElementById('portfolioDD');
+    const totalAllocatedOut = document.getElementById('totalAllocated');
+
+    // Charts containers
+    const allocChartDiv = document.getElementById('allocChart');
+    const barsChartDiv = document.getElementById('barsChart');
+
+    // Defaults (same as user requested)
+    const DEFAULTS = {
+      riesgoPct: 40,
+      riesgoYield: 10,
+      riesgoDD: 30,
+      rentaYield: 8,
+      rentaDD: 5
+    };
+
+    // Utility: format numbers
+    function fmtPct(x) {
+      if (x === null || x === undefined || isNaN(x)) return '—';
+      return (Math.round(x * 100) / 100).toLocaleString() + '%';
+    }
+    function fmtMoney(x) {
+      if (x === null || x === undefined || isNaN(x)) return '—';
+      // no currency symbol — user may want to decide currency
+      return Number(x).toLocaleString(undefined, { maximumFractionDigits: 2 });
+    }
+
+    // Sync slider & number input
+    riesgoPctEl.addEventListener('input', () => {
+      let v = parseFloat(riesgoPctEl.value) || 0;
+      if (v < 0) v = 0;
+      if (v > 100) v = 100;
+      riesgoSliderEl.value = v;
+      riesgoPctEl.value = v;
+    });
+    riesgoSliderEl.addEventListener('input', () => {
+      riesgoPctEl.value = riesgoSliderEl.value;
+    });
+
+    // Calculation function
+    function calculateAndRender() {
+      // read inputs (careful digit-by-digit)
+      const totalAmount = parseFloat(totalAmountEl.value) || 0;
+      const riesgoPct = Math.min(100, Math.max(0, Number(riesgoPctEl.value) || 0));
+      const rentaPct = 100 - riesgoPct;
+
+      // yields and drawdowns: treat inputs as percentages (e.g., 10 -> 10%)
+      const riesgoYield = parseFloat(riesgoYieldEl.value) || 0;
+      const riesgoDD = parseFloat(riesgoDDEl.value) || 0;
+      const rentaYield = parseFloat(rentaYieldEl.value) || 0;
+      const rentaDD = parseFloat(rentaDDEl.value) || 0;
+
+      // amounts
+      const riesgoAmt = totalAmount * (riesgoPct / 100);
+      const rentaAmt = totalAmount * (rentaPct / 100);
+      const totalAllocated = riesgoAmt + rentaAmt;
+
+      // weighted expected yield (simple weighted average)
+      const portfolioYield = (riesgoPct/100)*riesgoYield + (rentaPct/100)*rentaYield;
+
+      // weighted drawdown: user inputs magnitudes (e.g., 30 means -30%)
+      const portfolioDD = (riesgoPct/100)*riesgoDD + (rentaPct/100)*rentaDD;
+
+      // Render outputs
+      riesgoPctOut.textContent = fmtPct(riesgoPct);
+      rentaPctOut.textContent = fmtPct(rentaPct);
+
+      riesgoAmtOut.textContent = totalAmount ? ('$ ' + fmtMoney(riesgoAmt)) : '—';
+      rentaAmtOut.textContent = totalAmount ? ('$ ' + fmtMoney(rentaAmt)) : '—';
+
+      portfolioYieldOut.textContent = fmtPct(portfolioYield);
+      // show drawdown with negative sign for readability
+      portfolioDDOut.textContent = (portfolioDD === '—') ? '—' : '-' + fmtPct(portfolioDD);
+      totalAllocatedOut.textContent = totalAmount ? ('$ ' + fmtMoney(totalAllocated)) : (totalAmount === 0 ? 'No amount entered' : '—');
+
+      // Update charts
+      renderAllocationChart(riesgoPct, rentaPct);
+      renderBarsChart(riesgoYield, rentaYield, portfolioYield, -riesgoDD, -rentaDD, -portfolioDD);
+    }
+
+    // Plotly allocation (donut)
+    function renderAllocationChart(riesgoPct, rentaPct) {
+      const data = [{
+        values: [riesgoPct, rentaPct],
+        labels: ['Riesgo Argentino', 'Renta Fija + Cedears'],
+        hole: .55,
+        type: 'pie',
+        hoverinfo: 'label+percent',
+        textinfo: 'label+percent',
+        marker: {
+          colors: ['#0ea5e9', '#60a5fa']
+        },
+        textposition: 'inside',
+      }];
+      const layout = {
+        margin: { t: 10, r: 10, l: 10, b: 10 },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        showlegend: false,
+        annotations: [
+          {
+            text: 'Allocation',
+            x: 0.5,
+            y: 0.5,
+            showarrow: false,
+            font: { color: '#e6f0ff', size: 14 }
+          }
+        ],
+      };
+      Plotly.react(allocChartDiv, data, layout, {responsive: true});
+    }
+
+    // Bar chart: yields (positive) and drawdowns (negative)
+    function renderBarsChart(rYield, reYield, portYield, rDDneg, reDDneg, portDDneg) {
+      // yields trace (positive)
+      const traceYields = {
+        x: ['Riesgo Argentino','Renta Fija + Cedears','Portfolio'],
+        y: [rYield, reYield, portYield],
+        name: 'Expected Yield (%)',
+        type: 'bar',
+        marker: { color: '#38bdf8' }
+      };
+      // drawdowns trace (negative values)
+      const traceDD = {
+        x: ['Riesgo Argentino','Renta Fija + Cedears','Portfolio'],
+        y: [rDDneg, reDDneg, portDDneg],
+        name: 'Max Drawdown (%)',
+        type: 'bar',
+        marker: { color: '#fb7185' }
+      };
+      const data = [traceYields, traceDD];
+      const layout = {
+        barmode: 'group',
+        margin: { t: 20, r: 10, l: 40, b: 30 },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        xaxis: { tickfont: { color: '#e6f0ff' } },
+        yaxis: { title: '%', tickfont: { color: '#e6f0ff' }, zerolinecolor: '#94a3b8' },
+        legend: { orientation: 'h', xanchor: 'center', x: 0.5, font: { color: '#e6f0ff' } },
+      };
+      Plotly.react(barsChartDiv, data, layout, {responsive: true});
+    }
+
+    // Initialize with defaults & render
+    function resetToDefaults() {
+      riesgoPctEl.value = DEFAULTS.riesgoPct;
+      riesgoSliderEl.value = DEFAULTS.riesgoPct;
+      riesgoYieldEl.value = DEFAULTS.riesgoYield;
+      riesgoDDEl.value = DEFAULTS.riesgoDD;
+      rentaYieldEl.value = DEFAULTS.rentaYield;
+      rentaDDEl.value = DEFAULTS.rentaDD;
+      totalAmountEl.value = '';
+      calculateAndRender();
+    }
+
+    // Events
+    calcBtn.addEventListener('click', calculateAndRender);
+    resetBtn.addEventListener('click', resetToDefaults);
+
+    // live update when typing/changing values for fast feedback
+    [
+      riesgoPctEl, riesgoSliderEl,
+      riesgoYieldEl, riesgoDDEl,
+      rentaYieldEl, rentaDDEl,
+      totalAmountEl
+    ].forEach(el => el.addEventListener('input', () => {
+      // small debounce to avoid spamming plotly when sliding fast
+      if (window._calcTimeout) clearTimeout(window._calcTimeout);
+      window._calcTimeout = setTimeout(() => calculateAndRender(), 120);
+    }));
+
+    // kick off
+    resetToDefaults();
+
+  </script>
+</body>
+</html>
